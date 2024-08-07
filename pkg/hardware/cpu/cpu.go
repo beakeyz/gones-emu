@@ -25,4 +25,6 @@ type CPU interface {
 	Reset()
 	/* Executes a single CPU cycle */
 	DoCycle() error
+    /* Raises an NMI */
+    RaiseNmi()
 }

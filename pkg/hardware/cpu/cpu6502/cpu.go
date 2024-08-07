@@ -244,6 +244,14 @@ func (c *CPU6502) DoCycle() error {
 	return err
 }
 
+/*
+ * Transfers CPU control to the Nmi handler
+ *
+ */
+func (c *CPU6502) RaiseNmi() {
+
+}
+
 func New(sbus *bus.SystemBus) *CPU6502 {
 	var c CPU6502 = CPU6502{
 		registers: CPU6502Register{},

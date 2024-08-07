@@ -3,6 +3,7 @@ package mirror
 import (
 	"fmt"
 
+	"github.com/beakeyz/gones-emu/pkg/debug"
 	"github.com/beakeyz/gones-emu/pkg/hardware"
 )
 
@@ -38,6 +39,8 @@ func (m *Mirror) Read(addr uint16, value *uint8) error {
 	if mirror_addr > (*m.c).EndAddr() {
 		return fmt.Errorf("mirror: read outside child components reach")
 	}
+
+    debug.Log("Reading at %x -> %x\n", addr, mirror_addr)
 
 	// Redirect the read command
 	return (*m.c).Read(mirror_addr, value)

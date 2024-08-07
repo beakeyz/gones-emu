@@ -18,8 +18,13 @@ func NewSystembus() (*SystemBus, error) {
 	return &bus, nil
 }
 
-func (bus *SystemBus) AddComponent(comp hardware.Component) {
+func (bus *SystemBus) AddComponent(comp hardware.Component) error {
+    if (comp == nil) {
+        return errors.New("tried to add a nil component!")
+    }
+
 	bus.components = append(bus.components, comp)
+    return nil
 }
 
 func (bus *SystemBus) getComponent(addr uint16) *hardware.Component {

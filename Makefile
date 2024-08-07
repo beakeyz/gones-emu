@@ -9,6 +9,6 @@ debug: build
 	@./$(OUT)
 
 clean:
-	@rm $(BUILD_DIR)
+	@rm -r $(BUILD_DIR)
 
 .PHONY: build debug clean

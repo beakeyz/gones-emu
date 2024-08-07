@@ -8,17 +8,34 @@ import (
 	"github.com/beakeyz/gones-emu/pkg/hardware/cpu/cpu6502"
 	"github.com/beakeyz/gones-emu/pkg/hardware/memory/cartridge"
 	"github.com/beakeyz/gones-emu/pkg/hardware/memory/ram"
+	"github.com/beakeyz/gones-emu/pkg/hardware/mirror"
+	"github.com/beakeyz/gones-emu/pkg/hardware/ppu"
+	"github.com/beakeyz/gones-emu/pkg/video"
 )
 
 func main() {
 	var err error
+    // System bus for handling generic read and write operations
 	var sysbus *bus.SystemBus
-	var r *ram.Ram
+    // Video backend for drawing what the PPU wants
+    var vidBackend video.VideoBackend
+    // Main 6502 CPU for executing cartridge code
 	var c *cpu6502.CPU6502
+    // Pixel processing unit
+    var p *ppu.PPU
 
 	// Enable debugging
 	debug.Enable()
 
+    // Initialize the video backend
+	err = video.InitVideo(&vidBackend)
+
+    if (err != nil) {
+        debug.Error("Failed to initialize video")
+        return
+    }
+
+    // Create the system bus
 	sysbus, err = bus.NewSystembus()
 
 	if err != nil {
@@ -34,15 +51,18 @@ func main() {
 		return
 	}
 
-	// Add it's ram
-	r = ram.New(0, 0x0800, 2048)
+    // Add it's ram
+	sysbus.AddComponent(ram.New(0, 0x0800, 2048))
 
-	if r == nil {
-		debug.Error("Failed to create RAM")
-		return
-	}
+    // Create the ppu
+    p = ppu.New(0x2000, 0x2007)
 
-	sysbus.AddComponent(r)
+    // Try to add the ppu
+    sysbus.AddComponent(p)
+
+    for i := range(1023) {
+        sysbus.AddComponent(mirror.New(uint16(0x2008 + (i * 8)), uint16(0x200f + (i * 8)), p))
+    }
 
 	// Load a cartridge
 	err = cartridge.LoadCardridge(sysbus, "./res/Super Mario Bros (E).nes")
