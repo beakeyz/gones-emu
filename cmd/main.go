@@ -55,7 +55,7 @@ func main() {
 	sysbus.AddComponent(ram.New(0, 0x0800, 2048))
 
     // Create the ppu
-    p = ppu.New(0x2000, 0x2007)
+    p = ppu.New(&vidBackend, 0x2000, 0x2007)
 
     // Try to add the ppu
     sysbus.AddComponent(p)
