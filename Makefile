@@ -4,6 +4,7 @@ VENDOR_DIR = ./vendor
 OUT = $(BUILD_DIR)/gones
 
 build:
+	go mod vendor
 	go build -C cmd -o ../$(OUT)
 
 debug: build
@@ -12,6 +13,5 @@ debug: build
 clean:
 	@rm -r $(BUILD_DIR)
 	@rm -r $(VENDOR_DIR)
-	@go mod vendor
 
 .PHONY: build debug clean
