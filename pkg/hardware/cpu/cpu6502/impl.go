@@ -558,16 +558,35 @@ var cpu6502_imp = []InstrImpl{
 		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
 	}},
 	{Id: symNOP, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		debug.Log("NOPe")
+		return nil
 	}},
 	{Id: symORA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		value, _ := getValueBasedOnOpperand(c, i, opperand)
+
+		// Do the OR opperation
+		result := value & c.registers.a
+
+		debug.Log("ORA: m:%d & a:%d = a:%d\n", value, c.registers.a, result)
+
+		doNegativeCheck(c, result)
+		doZeroCheck(c, result)
+
+		// Write back result
+		c.registers.a = result
+		return nil
 	}},
 	{Id: symPHA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		debug.Log("PHA: a:%d\n", c.registers.a)
+
+		c.doPush8(c.registers.a)
+		return nil
 	}},
 	{Id: symPHP, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		debug.Log("PHP: p:0x%x\n", c.registers.p)
+
+		c.doPush8(c.registers.p)
+		return nil
 	}},
 	{Id: symPHX, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
 		// Illigal?
@@ -578,11 +597,24 @@ var cpu6502_imp = []InstrImpl{
 		return fmt.Errorf("(PHY) executing unimplemented instruction: %d", i.Instruction)
 	}},
 	{Id: symPLA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
+		var stacval byte
 
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		c.doPop8(&stacval)
+
+		debug.Log("PLA: s:%d -> a:%d\n", stacval, c.registers.a)
+
+		c.registers.a = stacval
+		return nil
 	}},
 	{Id: symPLP, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		var stacval byte
+
+		c.doPop8(&stacval)
+
+		debug.Log("PLP: s:%d -> p:%d\n", stacval, c.registers.p)
+
+		c.registers.p = stacval & ^uint8(C6502_FLAG_BFLAG|C6502_FLAG_RESERVED)
+		return nil
 	}},
 	{Id: symPLX, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
 		return fmt.Errorf("(PLX) executing unimplemented instruction: %d", i.Instruction)
@@ -591,16 +623,88 @@ var cpu6502_imp = []InstrImpl{
 		return fmt.Errorf("(PLY) executing unimplemented instruction: %d", i.Instruction)
 	}},
 	{Id: symROL, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+
+		caryfunc := func(val uint8) uint8 {
+			newval := val << 1
+
+			if c.HasFlag(C6502_FLAG_CARRY) {
+				newval |= 1
+			}
+
+			if (val & 0x7) == 0x7 {
+				c.SetFlag(C6502_FLAG_CARRY)
+			} else {
+				c.ClearFlag(C6502_FLAG_CARRY)
+			}
+
+			return newval
+		}
+
+		debug.Log("ROL: rotating mode: %d\n", i.Mode)
+
+		if i.Mode == ACC {
+			c.registers.a = caryfunc(c.registers.a)
+		} else {
+			val, addr := getValueBasedOnOpperand(c, i, opperand)
+
+			// Calculate new value
+			val = caryfunc(val)
+
+			c.sbus.Write(addr, val)
+		}
+
+		return nil
 	}},
 	{Id: symROR, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		caryfunc := func(val uint8) uint8 {
+			newval := val >> 1
+
+			if c.HasFlag(C6502_FLAG_CARRY) {
+				newval |= 0x7
+			}
+
+			if (val & 0x1) == 0x1 {
+				c.SetFlag(C6502_FLAG_CARRY)
+			} else {
+				c.ClearFlag(C6502_FLAG_CARRY)
+			}
+
+			return newval
+		}
+
+		debug.Log("ROR: rotating mode: %d\n", i.Mode)
+
+		if i.Mode == ACC {
+			c.registers.a = caryfunc(c.registers.a)
+		} else {
+			val, addr := getValueBasedOnOpperand(c, i, opperand)
+
+			// Calculate new value
+			val = caryfunc(val)
+
+			c.sbus.Write(addr, val)
+		}
+
+		return nil
 	}},
 	{Id: symRTI, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+
+		var pc byte
+
+		c.doPop8(&c.registers.p)
+		c.doPop8(&pc)
+
+		debug.Log("RTI: returning to pc:%d\n", pc)
+
+		// Set the pc
+		c.registers.pc = uint16(pc)
+		return nil
 	}},
 	{Id: symRTS, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("(RTS) executing unimplemented instruction: %d", i.Instruction)
+		c.doPop16(&c.registers.pc)
+
+		debug.Log("RTS: returning to pc:%d\n", c.registers.pc)
+		return nil
 	}},
 	{Id: symSBC, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
 		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
