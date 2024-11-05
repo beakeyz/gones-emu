@@ -1,4 +1,4 @@
-package hardware
+package comp
 
 type Component interface {
 	Read(addr uint16, value *uint8) error

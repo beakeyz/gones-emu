@@ -4,18 +4,18 @@ import (
 	"fmt"
 
 	"github.com/beakeyz/gones-emu/pkg/debug"
-	"github.com/beakeyz/gones-emu/pkg/hardware"
+	"github.com/beakeyz/gones-emu/pkg/hardware/comp"
 )
 
 /*
  */
 type Mirror struct {
-	c     *hardware.Component
+	c     *comp.Component
 	start uint16
 	end   uint16
 }
 
-func New(start uint16, end uint16, c hardware.Component) *Mirror {
+func New(start uint16, end uint16, c comp.Component) *Mirror {
 	var r Mirror = Mirror{
 		start: start,
 		end:   end,

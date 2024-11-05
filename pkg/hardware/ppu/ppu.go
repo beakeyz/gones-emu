@@ -37,11 +37,12 @@ const (
     PPU_CYCLES_PER_SCREEN = 89342
 )
 
-func New(backend *video.VideoBackend, start uint16, end uint16) *PPU {
+func New(backend *video.VideoBackend) *PPU {
     return &PPU{
         backend: backend,
-        start_addr: start,
-        end_addr: end,
+        /* This is register space (TODO: The other spaces (nametables, chr rom, pallet ram)) */
+        start_addr: 0x2000,
+        end_addr: 0x2007,
     }
 }
 

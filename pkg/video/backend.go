@@ -3,9 +3,17 @@ package video
 import "github.com/veandco/go-sdl2/sdl"
 
 type VideoBackend struct {
-    
     sdlWindow *sdl.Window
     sdlRenderer *sdl.Renderer
+
+    deferFlush bool
+}
+
+type Color struct {
+    r uint8
+    g uint8
+    b uint8
+    a uint8
 }
 
 func InitVideo(backend *VideoBackend) error {
@@ -25,10 +33,45 @@ func InitVideo(backend *VideoBackend) error {
         return err
     }
 
-    backend.sdlRenderer.SetDrawColor(0x1f, 0x1f, 0x1f, 0xff)
-    backend.sdlRenderer.Clear()
+    backend.deferFlush = true 
 
-    backend.sdlRenderer.Present()
+    backend.DrawRect(0, 0, 512, 512, Color { 0x1f, 0x1f, 0x1f, 0xff })
 
+    backend.DrawPixel(0, 0, Color{ 0x00, 0x00, 0xff, 0xff});
+
+    backend.DrawRect(50, 50, 52, 52, Color { 0x1f, 0x00, 0x1f, 0xff })
+
+    backend.Flush()
 	return nil
+}
+
+func (back *VideoBackend) DrawPixel(x int32, y int32, clr Color) {
+    // Set the color
+    back.sdlRenderer.SetDrawColor(clr.r, clr.g, clr.b, clr.a);
+
+    // Draw the pixel
+    back.sdlRenderer.DrawPoint(x, y)
+}
+
+func (back *VideoBackend) DrawRect(x int32, y int32, w int32, h int32, clr Color) {
+    rect := sdl.Rect {
+        X: x,
+        Y: y,
+        W: w,
+        H: h,
+    }
+
+    // Set the color
+    back.sdlRenderer.SetDrawColor(clr.r, clr.g, clr.b, clr.a);
+
+    // Draw the rect
+    back.sdlRenderer.FillRect(&rect)
+}
+
+func (back *VideoBackend) SetDeferFlush(def bool) {
+    back.deferFlush = def
+}
+
+func (back *VideoBackend) Flush() {
+    back.sdlRenderer.Present()
 }
