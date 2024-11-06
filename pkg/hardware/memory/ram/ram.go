@@ -10,11 +10,11 @@ import (
 type Ram struct {
 	start_addr uint16
 	end_addr   uint16
-	size       uint32
+	size       uint16
 	memory     []byte
 }
 
-func New(start uint16, end uint16, size uint32) *Ram {
+func New(start uint16, end uint16, size uint16) *Ram {
 	var r Ram = Ram{
 		start_addr: start,
 		end_addr:   end,
@@ -35,7 +35,8 @@ func (ram *Ram) Read(addr uint16, value *uint8) error {
 		return errors.New("ram: read out of range!")
 	}
 
-	*value = ram.memory[addr-ram.start_addr]
+    // Account for overshoots
+	*value = ram.memory[(addr-ram.start_addr) % uint16(ram.size)]
 	return nil
 }
 
@@ -44,8 +45,7 @@ func (ram *Ram) Write(addr uint16, value uint8) error {
 		return errors.New("ram: write out of range!")
 	}
 
-	ram.memory[addr-ram.start_addr] = byte(value)
-	ram.memory[addr] = byte(value)
+	ram.memory[(addr-ram.start_addr) % uint16(ram.size)] = byte(value)
 	return nil
 }
 

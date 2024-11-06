@@ -16,6 +16,15 @@ type Color struct {
     a uint8
 }
 
+const (
+    NES_SCREEN_HEIGHT = 262
+    NES_SCREEN_WIDTH = 341
+)
+
+func NewColor(r uint8, g uint8, b uint8, a uint8) Color {
+    return Color{ r, g, b, a, }
+} 
+
 func InitVideo(backend *VideoBackend) error {
     var err error 
 
@@ -27,7 +36,7 @@ func InitVideo(backend *VideoBackend) error {
     }
 
     /* Initialize a window and a renderer for us to draw with */
-    backend.sdlWindow, backend.sdlRenderer, err = sdl.CreateWindowAndRenderer(512, 512, 0)
+    backend.sdlWindow, backend.sdlRenderer, err = sdl.CreateWindowAndRenderer(NES_SCREEN_WIDTH * 2, NES_SCREEN_HEIGHT * 2, 0)
 
     if (err != nil) {
         return err
@@ -35,14 +44,20 @@ func InitVideo(backend *VideoBackend) error {
 
     backend.deferFlush = true 
 
-    backend.DrawRect(0, 0, 512, 512, Color { 0x1f, 0x1f, 0x1f, 0xff })
-
     backend.DrawPixel(0, 0, Color{ 0x00, 0x00, 0xff, 0xff});
-
     backend.DrawRect(50, 50, 52, 52, Color { 0x1f, 0x00, 0x1f, 0xff })
 
     backend.Flush()
 	return nil
+}
+
+func (back *VideoBackend) IsKeyPressed(a sdl.Keycode) bool {
+    sc := sdl.GetScancodeFromKey(a)
+    return (sdl.GetKeyboardState()[sc] == 1)
+}
+
+func (back *VideoBackend) DrawNESPixel(x int32, y int32, clr Color) {
+    back.DrawRect(x * 2, y * 2, 2, 2, clr)
 }
 
 func (back *VideoBackend) DrawPixel(x int32, y int32, clr Color) {

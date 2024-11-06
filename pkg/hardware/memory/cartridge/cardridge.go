@@ -40,7 +40,7 @@ func newNesHeader(data []byte) NESFileHeader {
 	return ret
 }
 
-func LoadCardridge(b *bus.SystemBus, filepath string) error {
+func LoadCardridge(cpuBus *bus.SystemBus, ppuBus *bus.SystemBus, filepath string) error {
 	var f *os.File
 	var err error
 	var buffer []byte = make([]byte, 16)
@@ -101,21 +101,29 @@ func LoadCardridge(b *bus.SystemBus, filepath string) error {
 	switch mapperNumber {
 	case 0:
 		var prg_rom *rom.Rom
-		prgbase := 0x8000
+        var chr_rom *rom.Rom
 
+		prgbase := 0x8000
 		prg_size := header.prgrom_sz
 
 		prg_rom = rom.New(uint16(prgbase), uint16(prgbase+prg_size)-1, uint32(prg_size), prg_buffer)
+        chr_rom = rom.New(0, uint16(header.chrrom_sz)-1, uint32(header.chrrom_sz), chr_buffer)
 
+        // Add an extra mirror, to account for the 16k ROM
 		if prg_size == 0x4000 {
 			mirror := mirror.New(uint16(prgbase+prg_size), uint16(prgbase+2*prg_size), prg_rom)
 
-			b.AddComponent(mirror)
+			cpuBus.AddComponent(mirror)
 		}
 
+        // Add the actual program rom component
+		cpuBus.AddComponent(prg_rom)
+        
 		debug.Log("PRG size: 0x%x (0x%x -> 0x%x)\n", header.prgrom_sz, prg_rom.StartAddr(), prg_rom.EndAddr())
 
-		b.AddComponent(prg_rom)
+        // Add the character rom to the PPU bus
+        ppuBus.AddComponent(chr_rom)
+
 		break
 	default:
 		return fmt.Errorf("found unimplemented mapper")

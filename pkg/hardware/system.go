@@ -26,6 +26,8 @@ type NESSystem struct {
     MainCpu *cpu6502.CPU6502
 	/* PPU */
     Ppu *ppu.PPU
+    /* Regular system RAM */
+    Ram *ram.Ram
 	/* Bus */
     Bus *bus.SystemBus
 
@@ -38,6 +40,7 @@ func InitNesSystem(vidBackend *video.VideoBackend, cardridgePath string) (*NESSy
     var ret *NESSystem = nil
     var _cpu *cpu6502.CPU6502 = nil
     var _ppu *ppu.PPU = nil
+    var _ram *ram.Ram = nil
     var _bus *bus.SystemBus = nil
 
     // Create the system bus for the CPU
@@ -62,7 +65,12 @@ func InitNesSystem(vidBackend *video.VideoBackend, cardridgePath string) (*NESSy
     }
 
     // Add it's ram
-	_bus.AddComponent(ram.New(0, 0x0800, 2048))
+	_ram = ram.New(0, 0x1fff, 0x0800)
+
+    // Add the ram component
+    _bus.AddComponent(_ram)
+
+    // Add the PPU component
     _bus.AddComponent(_ppu)
 
     // Add the PPUs mirrors of the register space
@@ -72,7 +80,7 @@ func InitNesSystem(vidBackend *video.VideoBackend, cardridgePath string) (*NESSy
     }
 
     // Try to load the cardridge
-    err = cartridge.LoadCardridge(_bus, cardridgePath)
+    err = cartridge.LoadCardridge(_bus, _ppu.PpuBus, cardridgePath)
 
     // Fuck
     if (err != nil) {
@@ -86,6 +94,7 @@ func InitNesSystem(vidBackend *video.VideoBackend, cardridgePath string) (*NESSy
         MainCpu: _cpu,
         Ppu: _ppu,
         Bus: _bus,
+        Ram: _ram,
         elapsedTicks: 0,
     }
 
@@ -95,10 +104,12 @@ func InitNesSystem(vidBackend *video.VideoBackend, cardridgePath string) (*NESSy
 func (system *NESSystem) SystemTick() {
 
     /* Do three PPU cycles, to comply with relative component speed */
-    system.Ppu.Execute(3);
+    system.Ppu.Execute(1);
 
     /* Do a single CPU cycle */
-    system.MainCpu.DoCycle()
+    if (system.elapsedTicks % (ppu.PPU_CYCLES_PER_CPU_CYCLE) == 0) {
+        system.MainCpu.DoCycle()
+    }
 
     /* Increment the system ticks */
     system.elapsedTicks++
