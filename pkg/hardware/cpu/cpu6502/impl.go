@@ -21,6 +21,16 @@ func getValueBasedOnOpperand(c *CPU6502, i *cpu.Instr, opperand []byte) (uint8, 
 		value = opperand[1]
 	} else {
 		switch i.Mode {
+		case REL:
+			offset := int8(opperand[1])
+
+			// I fucking hate this hack
+			if offset > 0 {
+				address = c.registers.pc + uint16(i.Len) + uint16(offset)
+			} else {
+				address = c.registers.pc + uint16(i.Len) - uint16(-offset)
+			}
+			break
 		case ZPG:
 			address = uint16(opperand[1]) % 256
 			break
@@ -84,7 +94,7 @@ func getValueBasedOnOpperand(c *CPU6502, i *cpu.Instr, opperand []byte) (uint8, 
 }
 
 func doNegativeCheck(c *CPU6502, value uint8) {
-	if (value & 0x7) == 0x7 {
+	if (value & 0x80) == 0x80 {
 		c.SetFlag(C6502_FLAG_NEGATIVE)
 	} else {
 		c.ClearFlag(C6502_FLAG_NEGATIVE)
@@ -114,12 +124,6 @@ func doCarryCheck(c *CPU6502, value uint16) {
 	} else {
 		c.ClearFlag(C6502_FLAG_CARRY)
 	}
-}
-
-func doRelativeJmp(c *CPU6502, opperand []byte) {
-	c.doRelativeJump(int8(opperand[1]))
-
-	debug.Log("Jumping to: pc + %d = 0x%x\n", int8(opperand[1]), c.registers.pc)
 }
 
 var cpu6502_imp = []InstrImpl{
@@ -228,15 +232,9 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		if int8(opperand[1]) < 0 {
-			c.doJump(c.registers.pc - uint16(-int8(opperand[1])))
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
 
-			debug.Log("Jumping to: pc-%d\n", uint16(-int8(opperand[1])))
-		} else {
-			c.doJump(c.registers.pc + uint16(opperand[1]))
-
-			debug.Log("Jumping to: pc+%d\n", uint16(opperand[1]))
-		}
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBCS, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -248,15 +246,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		if int8(opperand[1]) < 0 {
-			c.doJump(c.registers.pc - uint16(-int8(opperand[1])))
-
-			debug.Log("Jumping to: pc-%d\n", uint16(-int8(opperand[1])))
-		} else {
-			c.doJump(c.registers.pc + uint16(opperand[1]))
-
-			debug.Log("Jumping to: pc+%d\n", uint16(opperand[1]))
-		}
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBEQ, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -268,7 +259,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBIT, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -282,7 +274,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBNE, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -292,7 +285,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBPL, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -302,7 +296,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBRA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -318,7 +313,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symBVS, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -328,7 +324,8 @@ var cpu6502_imp = []InstrImpl{
 			return nil
 		}
 
-		doRelativeJmp(c, opperand)
+		_, addr := getValueBasedOnOpperand(c, i, opperand)
+		c.next_pc = addr
 		return nil
 	}},
 	{Id: symCLC, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -504,21 +501,20 @@ var cpu6502_imp = []InstrImpl{
 
 		debug.Log("JMP: to addr: 0x%x\n", address)
 
-		c.doJump(address)
+		c.next_pc = address
 		return nil
 	}},
 	{Id: symJSR, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
+		_, target_addr := getValueBasedOnOpperand(c, i, opperand)
+		return_addr := c.registers.pc + uint16(i.Len) - 1
 
-		next_pc := c.registers.pc + 2
-		target_addr := get16BitAddressLE(opperand)
-
-		debug.Log("Doing JSR: retaddr=0x%x, targetaddr=0x%x\n", next_pc, target_addr)
+		debug.Log("Doing JSR: retaddr=0x%x, targetaddr=0x%x\n", return_addr, target_addr)
 
 		// Push the return address
-		c.doPush16(next_pc)
+		c.doPush16(return_addr)
 
 		// Do the CPU push
-		c.doJump(target_addr)
+		c.next_pc = (target_addr)
 		return nil
 	}},
 	{Id: symLDA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
@@ -701,7 +697,11 @@ var cpu6502_imp = []InstrImpl{
 		return nil
 	}},
 	{Id: symRTS, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		c.doPop16(&c.registers.pc)
+		// Pop this shit back
+		c.doPop16(&c.next_pc)
+
+		// Add a bit lul
+		c.next_pc++
 
 		debug.Log("RTS: returning to pc:%d\n", c.registers.pc)
 		return nil

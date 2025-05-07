@@ -48,6 +48,7 @@ type CPU6502 struct {
 	c_instr *cpu.Instr
 	/* Amount of cycles we've spent at this instruction */
 	n_cycles  byte
+	next_pc   uint16
 	impl_list []InstrImpl
 }
 
@@ -70,6 +71,7 @@ func (cpu *CPU6502) Initialize() {
 	debug.Log("a: 0x%x, b: 0x%x\n", a, b)
 
 	regs.pc = uint16(a) | (uint16(b) << 8)
+	cpu.next_pc = regs.pc
 
 	// 31 e6 -> e631
 	debug.Log("PC: 0x%x\n", regs.pc)
@@ -108,20 +110,6 @@ func (c *CPU6502) ClearFlag(flag byte) {
 
 func (c *CPU6502) HasFlag(flag byte) bool {
 	return (c.registers.p & flag) == flag
-}
-
-func (c *CPU6502) doJump(addr uint16) {
-	c.registers.pc = addr
-	// Tell DoCycle that we want to jump
-	c.c_instr = nil
-}
-
-func (c *CPU6502) doRelativeJump(offset int8) {
-	if offset < 0 {
-		c.registers.pc -= uint16(-offset)
-	} else {
-		c.registers.pc += uint16(offset)
-	}
 }
 
 func (c *CPU6502) doPush8(value uint8) {
@@ -167,6 +155,34 @@ func (cpu *CPU6502) fetchInstrImpl(instid cpu.InstrID) *InstrImpl {
 	return impl
 }
 
+func (c *CPU6502) GetPageAddress(addr uint16) uint16 {
+	return (addr & 0xff00)
+}
+
+func (c *CPU6502) ExecuteFrame(cpuCyclesElapsed *int) error {
+
+	var err error
+
+	if cpuCyclesElapsed == nil {
+		return fmt.Errorf("Got an invalid parameter")
+	}
+
+	// Reset shit
+	c.n_cycles = 0
+
+	// Execute a single instruction
+	err = c.ExecuteInstruction()
+
+	if err != nil {
+		return err
+	}
+
+	// Export the amount of cycles it took
+	*cpuCyclesElapsed = int(c.n_cycles)
+
+	return nil
+}
+
 /*
  * Do a single 6502 clockcycle
  *
@@ -175,71 +191,76 @@ func (cpu *CPU6502) fetchInstrImpl(instid cpu.InstrID) *InstrImpl {
  *
  * Otherwise fetch a new instruction from the PC
  */
-func (c *CPU6502) DoCycle() error {
+func (c *CPU6502) ExecuteInstruction() error {
 	var err error
 	var c_instr cpu.Instr
 	var impl *InstrImpl
 
-	if c.c_instr == nil {
-		var c_opcode byte
+	var c_opcode byte
 
-		// Read the opcode from PC
-		err = c.sbus.Read(c.registers.pc, &c_opcode)
+	debug.Log("Reading... pc=0x%x\n", c.registers.pc)
 
-		if err != nil {
-			return err
-		}
+	// Read the opcode from PC
+	err = c.sbus.Read(c.registers.pc, &c_opcode)
 
-		// Try to get the instruction for this opcode
-		c_instr, err = GetInstr(c_opcode)
-
-		if err != nil {
-			return err
-		}
-
-		c.c_instr = &c_instr
-		c.n_cycles = 0
+	if err != nil {
+		return err
 	}
 
-	// Add a cycle
-	c.n_cycles++
+	// Try to get the instruction for this opcode
+	c_instr, err = GetInstr(c_opcode)
 
-	// Reached the end of this instruction, execute the next intruction next cycle
-	if c.n_cycles == c.c_instr.Cycles {
-
-		var opperand []byte = make([]byte, c.c_instr.Len)
-
-		err = c.fetchOpperand(opperand, c.c_instr.Len)
-
-		if err != nil {
-			return err
-		}
-
-		impl = c.fetchInstrImpl(c.c_instr.Instruction)
-
-		if impl == nil {
-			return fmt.Errorf("cpu6502: fetching unimplemented instruction: %d\n", c.c_instr.Instruction)
-		}
-
-		debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
-
-		err = impl.Impl(c, c.c_instr, opperand)
-
-		if err != nil {
-			return err
-		}
-
-		// Increment the pc to the next instruction, if the c_instr field isn't nil
-		// NOTE: Instructions like jmp, that work directly on the PC may use this fact
-		// to indicate we simply need to execute the next thing without adding shit to
-		// the PC
-		if c.c_instr != nil {
-			c.registers.pc += uint16(c.c_instr.Len)
-		}
-
-		// Reset the current instruction to nil to prompt an instruction fetch on the next cycle
-		c.c_instr = nil
+	if err != nil {
+		return err
 	}
+
+	debug.Log("Executing instruction: 0x%x (opcode=0x%x)\n", c_instr.Instruction, c_instr.Opcode)
+
+	c.c_instr = &c_instr
+
+	var opperand []byte = make([]byte, c.c_instr.Len)
+
+	err = c.fetchOpperand(opperand, c.c_instr.Len)
+
+	if err != nil {
+		return err
+	}
+
+	impl = c.fetchInstrImpl(c.c_instr.Instruction)
+
+	if impl == nil {
+		return fmt.Errorf("cpu6502: fetching unimplemented instruction: %d\n", c.c_instr.Instruction)
+	}
+
+	debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
+
+	err = impl.Impl(c, c.c_instr, opperand)
+
+	if err != nil {
+		return err
+	}
+
+	// Add the size of this instruction if next_pc didn't change
+	if c.next_pc == c.registers.pc {
+		c.next_pc = c.registers.pc + uint16(c.c_instr.Len)
+	} else {
+		// We took a branch. Add a cycle
+		c.n_cycles++
+
+		// Add an extra cycle if we crossed a page boundry
+		if c.GetPageAddress(c.next_pc) != c.GetPageAddress(c.registers.pc) {
+			c.n_cycles++
+		}
+	}
+
+	// Add this instructions cycles
+	c.n_cycles += c.c_instr.Cycles
+
+	// TODO: Add this instruction page crossed cycles cound maybe
+
+	c.registers.pc = c.next_pc
+
+	debug.Log("PC is now: 0x%x\n", c.registers.pc)
 
 	return err
 }
@@ -249,6 +270,10 @@ func (c *CPU6502) DoCycle() error {
  *
  */
 func (c *CPU6502) RaiseNmi() {
+
+}
+
+func (c *CPU6502) RaiseIrq() {
 
 }
 
