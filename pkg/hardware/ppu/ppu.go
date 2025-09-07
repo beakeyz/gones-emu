@@ -191,6 +191,10 @@ func (ppu *PPU) IsHBlank() bool {
 	return (ppu.pixel_x >= 257 && ppu.pixel_x <= 320)
 }
 
+func (ppu *PPU) SelectPxColor() video.Color {
+	return ppu.nesPallet[(ppu.pixel_clock/PPU_CYCLES_PER_SCANLINE)%0x40]
+}
+
 /*!
  * Called when the ppu does a 'cycle'
  */
@@ -208,11 +212,13 @@ func (ppu *PPU) Execute(ticks int) error {
 			if ppu.IsHBlank() {
 
 			} else {
+				color := ppu.SelectPxColor()
 
 				ppu.backend.DrawNESPixel(
 					ppu.pixel_x,
 					ppu.pixel_y,
-					ppu.nesPallet[(ppu.pixel_clock/PPU_CYCLES_PER_SCANLINE)%0x40])
+					color)
+
 			}
 
 		} else { // Post-render and VBlank
@@ -272,6 +278,7 @@ func (ppu *PPU) Read(addr uint16, value *uint8) error {
 	case 0x2005:
 	case 0x2006:
 	case 0x2007:
+
 		break
 	default:
 		break

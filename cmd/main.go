@@ -25,13 +25,12 @@ func main() {
 
 	nes, err = hardware.InitNesSystem(&vidBackend, "res/SuperMarioBros.nes")
 
-	for true {
-		err = nes.SystemFrame()
-
-		if err != nil {
-			break
-		}
+	if err != nil {
+		debug.Error("Failed to init nes system!")
+		return
 	}
 
-	debug.Log("\nExited with the error: %s\n", err.Error())
+	nes.StartLoop()
+
+	// debug.Log("\nExited with the error: %s\n", err.Error())
 }

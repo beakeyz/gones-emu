@@ -198,7 +198,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 
 	var c_opcode byte
 
-	debug.Log("Reading... pc=0x%x\n", c.registers.pc)
+	// debug.Log("Reading... pc=0x%x\n", c.registers.pc)
 
 	// Read the opcode from PC
 	err = c.sbus.Read(c.registers.pc, &c_opcode)
@@ -232,7 +232,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 		return fmt.Errorf("cpu6502: fetching unimplemented instruction: %d\n", c.c_instr.Instruction)
 	}
 
-	debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
+	// debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
 
 	err = impl.Impl(c, c.c_instr, opperand)
 
@@ -260,7 +260,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 
 	c.registers.pc = c.next_pc
 
-	debug.Log("PC is now: 0x%x\n", c.registers.pc)
+	// debug.Log("PC is now: 0x%x\n", c.registers.pc)
 
 	return err
 }
