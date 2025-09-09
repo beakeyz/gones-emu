@@ -29,7 +29,7 @@ func NewFont(backend *VideoBackend) Font {
 	return ret
 }
 
-func (self *Font) DrawGlyph(x int, y int, g byte, color Color, nesglyph bool) {
+func (self *Font) DrawGlyph(x int, y int, g byte, color Color, backcolor Color, nesglyph bool) {
 
 	// Grab the pixel draw function from the backend
 
@@ -57,6 +57,8 @@ func (self *Font) DrawGlyph(x int, y int, g byte, color Color, nesglyph bool) {
 
 			if (d & (1 << bit)) == (1 << bit) {
 				px(int32(x+bit), int32(y+idx), color)
+			} else {
+				px(int32(x+bit), int32(y+idx), backcolor)
 			}
 		}
 	}

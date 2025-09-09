@@ -77,6 +77,30 @@ func (cpu *CPU6502) Initialize() {
 	debug.Log("PC: 0x%x\n", regs.pc)
 }
 
+func (self *CPU6502) GetAccumulator() uint8 {
+	return self.registers.a
+}
+
+func (self *CPU6502) GetX() uint8 {
+	return self.registers.x
+}
+
+func (self *CPU6502) GetY() uint8 {
+	return self.registers.y
+}
+
+func (self *CPU6502) GetFlags() uint8 {
+	return self.registers.p
+}
+
+func (self *CPU6502) GetStackpointer() uint8 {
+	return self.registers.s
+}
+
+func (self *CPU6502) GetPC() uint16 {
+	return self.registers.pc
+}
+
 func (cpu *CPU6502) Reset() {
 	var regs *CPU6502Register = &cpu.registers
 

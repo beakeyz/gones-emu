@@ -2,6 +2,8 @@ package hardware
 
 import (
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/beakeyz/gones-emu/pkg/hardware/bus"
 	"github.com/beakeyz/gones-emu/pkg/hardware/cpu/cpu6502"
@@ -130,6 +132,33 @@ func (system *NESSystem) SystemFrame() error {
 	return nil
 }
 
+func (system *NESSystem) displayDebugInfo() {
+	var b *video.VideoBackend = system.vbackend
+
+	s := fmt.Sprintf(
+		"A: 0x%x, Flags: 0x%x",
+		system.MainCpu.GetAccumulator(),
+		system.MainCpu.GetFlags(),
+	)
+
+	b.DrawText(500, 25, s, video.ColorWhite())
+}
+
+func (system *NESSystem) preDraw() {
+
+	// Draw the background
+
+	system.vbackend.UpdateBackground()
+
+	// Draw the title text
+
+	system.vbackend.DrawText(0, 0, "GONES!", video.ColorWhite())
+
+	// Draw some debug info
+
+	system.displayDebugInfo()
+}
+
 func (system *NESSystem) StartLoop() {
 
 	running := true
@@ -144,6 +173,8 @@ func (system *NESSystem) StartLoop() {
 			running = false
 		}
 
+		system.preDraw()
+
 		if system.vbackend.IsKeyPressed(sdl.K_RETURN) && !ran_tick {
 			err := system.SystemFrame()
 
@@ -157,5 +188,9 @@ func (system *NESSystem) StartLoop() {
 		if !system.vbackend.IsKeyPressed(sdl.K_RETURN) && ran_tick {
 			ran_tick = false
 		}
+
+		system.vbackend.Flush()
+
+		time.Sleep(time.Millisecond)
 	}
 }

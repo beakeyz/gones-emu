@@ -6,7 +6,8 @@ type VideoBackend struct {
 	sdlWindow   *sdl.Window
 	sdlRenderer *sdl.Renderer
 
-	defaultFont Font
+	defaultFont     Font
+	backgroundColor Color
 
 	deferFlush bool
 }
@@ -37,6 +38,10 @@ func NewColor(r uint8, g uint8, b uint8, a uint8) Color {
 	return Color{r, g, b, a}
 }
 
+func ColorWhite() Color {
+	return NewColor(0xff, 0xff, 0xff, 0xff)
+}
+
 func InitVideo(backend *VideoBackend) error {
 	var err error
 
@@ -61,14 +66,7 @@ func InitVideo(backend *VideoBackend) error {
 	// Defer flushing calls
 
 	backend.deferFlush = true
-
-	backend.DrawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, NewColor(0x1f, 0x1f, 0x1f, 0xff))
-
-	backend.DrawRect(NES_SCREEN_X_START, NES_SCREEN_Y_START, NES_SCREEN_WIDTH*NES_PTHP_RATIO, NES_SCREEN_HEIGHT*NES_PTHP_RATIO, NewColor(0x00, 0x00, 0x00, 0xff))
-
-	backend.DrawText(0, 0, "Hello There! !@#$%^&*()_", NewColor(0xff, 0xff, 0xff, 0xff))
-
-	backend.Flush()
+	backend.backgroundColor = NewColor(0x1f, 0x1f, 0x1f, 0xff)
 
 	return nil
 }
@@ -121,6 +119,10 @@ func (back *VideoBackend) DrawRect(x int32, y int32, w int32, h int32, clr Color
 	back.sdlRenderer.FillRect(&rect)
 }
 
+func (back *VideoBackend) UpdateBackground() {
+	back.DrawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, back.backgroundColor)
+}
+
 func (back *VideoBackend) SetDeferFlush(def bool) {
 	back.deferFlush = def
 }
@@ -137,7 +139,7 @@ func (back *VideoBackend) drawText(x int32, y int32, text string, color Color, n
 
 		// Draw the current glyph
 
-		back.defaultFont.DrawGlyph(int(x), int(y), byte(d), color, nes)
+		back.defaultFont.DrawGlyph(int(x), int(y), byte(d), color, back.backgroundColor, nes)
 
 		// Add an offset to the x-coordinate
 
