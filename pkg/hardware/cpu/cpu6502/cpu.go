@@ -77,6 +77,30 @@ func (cpu *CPU6502) Initialize() {
 	debug.Log("PC: 0x%x\n", regs.pc)
 }
 
+func (self *CPU6502) GetAccumulator() uint8 {
+	return self.registers.a
+}
+
+func (self *CPU6502) GetX() uint8 {
+	return self.registers.x
+}
+
+func (self *CPU6502) GetY() uint8 {
+	return self.registers.y
+}
+
+func (self *CPU6502) GetFlags() uint8 {
+	return self.registers.p
+}
+
+func (self *CPU6502) GetStackpointer() uint8 {
+	return self.registers.s
+}
+
+func (self *CPU6502) GetPC() uint16 {
+	return self.registers.pc
+}
+
 func (cpu *CPU6502) Reset() {
 	var regs *CPU6502Register = &cpu.registers
 
@@ -198,7 +222,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 
 	var c_opcode byte
 
-	debug.Log("Reading... pc=0x%x\n", c.registers.pc)
+	// debug.Log("Reading... pc=0x%x\n", c.registers.pc)
 
 	// Read the opcode from PC
 	err = c.sbus.Read(c.registers.pc, &c_opcode)
@@ -232,7 +256,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 		return fmt.Errorf("cpu6502: fetching unimplemented instruction: %d\n", c.c_instr.Instruction)
 	}
 
-	debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
+	// debug.Log("(0x%x Len:%d): ", c.registers.pc, c.c_instr.Len)
 
 	err = impl.Impl(c, c.c_instr, opperand)
 
@@ -260,7 +284,7 @@ func (c *CPU6502) ExecuteInstruction() error {
 
 	c.registers.pc = c.next_pc
 
-	debug.Log("PC is now: 0x%x\n", c.registers.pc)
+	// debug.Log("PC is now: 0x%x\n", c.registers.pc)
 
 	return err
 }

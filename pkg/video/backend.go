@@ -6,6 +6,9 @@ type VideoBackend struct {
 	sdlWindow   *sdl.Window
 	sdlRenderer *sdl.Renderer
 
+	defaultFont     Font
+	backgroundColor Color
+
 	deferFlush bool
 }
 
@@ -17,10 +20,15 @@ type Color struct {
 }
 
 const (
-	//NES_SCREEN_HEIGHT = 262
-	//NES_SCREEN_WIDTH  = 341
+	SCREEN_HEIGHT     = 1000
+	SCREEN_WIDTH      = 1150
 	NES_SCREEN_HEIGHT = 240
 	NES_SCREEN_WIDTH  = 256
+
+	// Offset the NES screen a bit from the top left
+
+	NES_SCREEN_X_START = 25
+	NES_SCREEN_Y_START = 25
 
 	/* NES pixel to HOST pixel ratio */
 	NES_PTHP_RATIO = 2
@@ -28,6 +36,10 @@ const (
 
 func NewColor(r uint8, g uint8, b uint8, a uint8) Color {
 	return Color{r, g, b, a}
+}
+
+func ColorWhite() Color {
+	return NewColor(0xff, 0xff, 0xff, 0xff)
 }
 
 func InitVideo(backend *VideoBackend) error {
@@ -41,24 +53,36 @@ func InitVideo(backend *VideoBackend) error {
 	}
 
 	/* Initialize a window and a renderer for us to draw with */
-	backend.sdlWindow, backend.sdlRenderer, err = sdl.CreateWindowAndRenderer(NES_SCREEN_WIDTH*NES_PTHP_RATIO, NES_SCREEN_HEIGHT*NES_PTHP_RATIO, 0)
+	backend.sdlWindow, backend.sdlRenderer, err = sdl.CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT, 0)
 
 	if err != nil {
 		return err
 	}
 
+	// Create a new font for us to use
+
+	backend.defaultFont = NewFont(backend)
+
+	// Defer flushing calls
+
 	backend.deferFlush = true
+	backend.backgroundColor = NewColor(0x1f, 0x1f, 0x1f, 0xff)
 
-	backend.DrawPixel(0, 0, Color{0x00, 0x00, 0xff, 0xff})
-	backend.DrawRect(50, 50, 52, 52, Color{0x1f, 0x00, 0x1f, 0xff})
-
-	backend.Flush()
 	return nil
+}
+
+/*
+ * TODO: Rename the 'video' package lmao
+ *
+ * It's much more than video atm
+ */
+func (back *VideoBackend) CollectEvent() sdl.Event {
+	return sdl.PollEvent()
 }
 
 func (back *VideoBackend) IsKeyPressed(a sdl.Keycode) bool {
 	sc := sdl.GetScancodeFromKey(a)
-	return (sdl.GetKeyboardState()[sc] == 1)
+	return (sdl.GetKeyboardState()[sc] != 0)
 }
 
 func (back *VideoBackend) DrawNESPixel(x int32, y int32, clr Color) {
@@ -67,7 +91,9 @@ func (back *VideoBackend) DrawNESPixel(x int32, y int32, clr Color) {
 		return
 	}
 
-	back.DrawRect(x*NES_PTHP_RATIO, y*NES_PTHP_RATIO, NES_PTHP_RATIO, NES_PTHP_RATIO, clr)
+	// Add the offset of the NES screen to these coords
+
+	back.DrawRect(x*NES_PTHP_RATIO+NES_SCREEN_X_START, y*NES_PTHP_RATIO+NES_SCREEN_Y_START, NES_PTHP_RATIO, NES_PTHP_RATIO, clr)
 }
 
 func (back *VideoBackend) DrawPixel(x int32, y int32, clr Color) {
@@ -93,10 +119,38 @@ func (back *VideoBackend) DrawRect(x int32, y int32, w int32, h int32, clr Color
 	back.sdlRenderer.FillRect(&rect)
 }
 
+func (back *VideoBackend) UpdateBackground() {
+	back.DrawRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, back.backgroundColor)
+}
+
 func (back *VideoBackend) SetDeferFlush(def bool) {
 	back.deferFlush = def
 }
 
 func (back *VideoBackend) Flush() {
 	back.sdlRenderer.Present()
+}
+
+func (back *VideoBackend) drawText(x int32, y int32, text string, color Color, nes bool) {
+
+	// Loop over all runes inside the provided text
+
+	for _, d := range text {
+
+		// Draw the current glyph
+
+		back.defaultFont.DrawGlyph(int(x), int(y), byte(d), color, back.backgroundColor, nes)
+
+		// Add an offset to the x-coordinate
+
+		x += 8
+	}
+}
+
+func (back *VideoBackend) DrawNESText(x int32, y int32, text string, color Color) {
+	back.drawText(x, y, text, color, true)
+}
+
+func (back *VideoBackend) DrawText(x int32, y int32, text string, color Color) {
+	back.drawText(x, y, text, color, false)
 }

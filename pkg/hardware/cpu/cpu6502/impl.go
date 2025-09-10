@@ -30,26 +30,19 @@ func getValueBasedOnOpperand(c *CPU6502, i *cpu.Instr, opperand []byte) (uint8, 
 			} else {
 				address = c.registers.pc + uint16(i.Len) - uint16(-offset)
 			}
-			break
 		case ZPG:
 			address = uint16(opperand[1]) % 256
-			break
 		case ZPX:
 			address = (uint16(opperand[1]) + uint16(c.registers.x)) % 256
-			break
 		case ZPY:
 			address = (uint16(opperand[1]) + uint16(c.registers.y)) % 256
-			break
 		case ABS:
 			// Grab the 16 bit address
 			address = get16BitAddressLE(opperand)
-			break
 		case ABX:
 			address = get16BitAddressLE(opperand) + uint16(c.registers.x)
-			break
 		case ABY:
 			address = get16BitAddressLE(opperand) + uint16(c.registers.y)
-			break
 		case IDX:
 			var placeholder_1 uint8 = 0
 			var placeholder_2 uint8 = 0
@@ -65,7 +58,6 @@ func getValueBasedOnOpperand(c *CPU6502, i *cpu.Instr, opperand []byte) (uint8, 
 
 			// Construct the full address
 			address = uint16(placeholder_1) | (uint16(placeholder_2) << 8)
-			break
 		case IDY:
 			var placeholder_1 uint8 = 0
 			var placeholder_2 uint8 = 0
@@ -83,7 +75,6 @@ func getValueBasedOnOpperand(c *CPU6502, i *cpu.Instr, opperand []byte) (uint8, 
 			address = uint16(placeholder_1) | (uint16(placeholder_2) << 8)
 			// Add the conents of the y register
 			address += uint16(c.registers.y)
-			break
 		}
 
 		// Read from the retrived address following the correct mode
@@ -264,7 +255,22 @@ var cpu6502_imp = []InstrImpl{
 		return nil
 	}},
 	{Id: symBIT, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		debug.Log("executing BIT\n")
+
+		value, _ := getValueBasedOnOpperand(c, i, opperand)
+
+		result := c.registers.a & value
+
+		// Set bit 6 and 7 of the value into the status register
+
+		c.registers.p = (c.registers.p & 0x3f) | (value & 0xC0)
+
+		// Also perform zero check on this instruction
+
+		doZeroCheck(c, result)
+
+		// return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		return nil
 	}},
 	{Id: symBMI, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
 
@@ -765,7 +771,11 @@ var cpu6502_imp = []InstrImpl{
 		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
 	}},
 	{Id: symTXA, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
-		return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		// return fmt.Errorf("executing unimplemented instruction: %d", i.Instruction)
+		debug.Log("TSA: pushing a=0x%x on the stack\n", c.registers.a)
+
+		c.doPush8(c.registers.a)
+		return nil
 	}},
 	{Id: symTXS, Impl: func(c *CPU6502, i *cpu.Instr, opperand []byte) error {
 
